@@ -1,0 +1,41 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+		<title>Noten</title>
+
+		<style type="text/css">
+			body
+			{
+				background-color: #000000;
+			}
+
+			#container
+			{
+				width: 642px;
+				height: 482px;
+				box-sizing: border-box;
+			}
+		</style>
+
+		<script src="t_engine.js"></script>
+		<script src="fr_indicator.js"></script>
+		<script src="client_session.js"></script>
+		<script>
+			var nt;
+
+			window.onload = function()
+			{
+				nt = new ClientSession(document.getElementById("container"));
+			};
+
+			window.onkeydown = function(e){ nt.HandleKeyEvent(e, true); };
+			window.onkeyup = function(e){ nt.HandleKeyEvent(e, false); };
+		</script>
+	</head>
+	<body>
+		<div id="container">
+		</div>
+	</body>
+</html>
