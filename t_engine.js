@@ -1,22 +1,33 @@
-var TEngine = function()
-{
-	this.reset_needed = false;
-	this.waiting = true;
-	this.ball_intangible = false;
-	this.launch_turn = true;
+var TEngine = function(old_state)
+	{
+		if(typeof old_state == "undefined")
+		{
+			this.frame_index = 0;
 
-	this.l_use_ai = false;
-	this.r_use_ai = true;
+			this.reset_needed = false;
+			this.waiting = true;
+			this.ball_intangible = false;
+			this.launch_turn = true;
 
-	this.ball_pos = [(this.field_width - this.ball_size) / 2, (this.field_height - this.ball_size) / 2];
-	this.ball_vel = [0, 0];
+			this.l_use_ai = false;
+			this.r_use_ai = true;
 
-	this.l_paddle_y = this.r_paddle_y = (this.field_height - this.paddle_length) / 2;
-	this.l_score = this.r_score = 0;
+			this.ball_pos = [(this.field_width - this.ball_size) / 2, (this.field_height - this.ball_size) / 2];
+			this.ball_vel = [0, 0];
 
-	this.l_buttons = {up: false, down: false, launch: false};
-	this.r_buttons = {up: false, down: false, launch: false};
-};
+			this.l_paddle_y = this.r_paddle_y = (this.field_height - this.paddle_length) / 2;
+			this.l_score = this.r_score = 0;
+
+			this.l_buttons = {up: -1, down: -1, launch: -1};
+			this.r_buttons = {up: -1, down: -1, launch: -1};
+		}
+		else
+		{
+			this.copyFrom(old_state);
+		}
+	};
+
+TEngine.prototype.tick_interval = 1000 / 30;
 
 TEngine.prototype.ball_size = 16;
 TEngine.prototype.ball_launch_speed = 14;
@@ -74,166 +85,219 @@ TEngine.prototype.render = function(context, x, y, width)
 }
 
 TEngine.prototype.tick = function()
-{
-	if(this.l_use_ai) this.runAI(true);
-	if(this.r_use_ai) this.runAI(false);
-
-	if(this.l_buttons.up & !this.l_buttons.down && this.l_paddle_y > this.paddle_y_offset)
-		this.l_paddle_y -= this.paddle_speed;
-	else if(this.l_buttons.down && !this.l_buttons.up && this.l_paddle_y + this.paddle_length < this.field_height - this.paddle_y_offset)
-		this.l_paddle_y += this.paddle_speed;
-
-	if(this.r_buttons.up & !this.r_buttons.down && this.r_paddle_y > this.paddle_y_offset)
-		this.r_paddle_y -= this.paddle_speed;
-	else if(this.r_buttons.down && !this.r_buttons.up && this.r_paddle_y + this.paddle_length < this.field_height - this.paddle_y_offset)
-		this.r_paddle_y += this.paddle_speed;
-
-	if(this.reset_needed)
 	{
-		this.reset_needed = false;
-		this.waiting = true;
-		this.ball_intangible = false;
+		this.frame_index ++;
 
-		this.ball_pos = [(this.field_width - this.ball_size) / 2, (this.field_height - this.ball_size) / 2];
-		this.ball_vel = [0, 0];
-	}
-	else if(this.waiting)
-	{
-		if((this.launch_turn && this.l_buttons.launch) || (!this.launch_turn && this.r_buttons.launch))
+		if(this.l_use_ai) this.runAI(true);
+		if(this.r_use_ai) this.runAI(false);
+
+		if(this.pressed(true, "up") & !this.pressed(true, "down") && this.l_paddle_y > this.paddle_y_offset)
+			this.l_paddle_y -= this.paddle_speed;
+		else if(this.pressed(true, "down") && !this.pressed(true, "up") &&
+				this.l_paddle_y + this.paddle_length < this.field_height - this.paddle_y_offset)
+			this.l_paddle_y += this.paddle_speed;
+
+		if(this.pressed(false, "up") & !this.pressed(false, "down") && this.r_paddle_y > this.paddle_y_offset)
+			this.r_paddle_y -= this.paddle_speed;
+		else if(this.pressed(false, "down") && !this.pressed(false, "up") &&
+				this.r_paddle_y + this.paddle_length < this.field_height - this.paddle_y_offset)
+			this.r_paddle_y += this.paddle_speed;
+
+		if(this.reset_needed)
 		{
-			this.waiting = false;
-			this.launch_turn = !this.launch_turn;
+			this.reset_needed = false;
+			this.waiting = true;
+			this.ball_intangible = false;
 
-			this.ball_vel[0] = (2 * this.ball_launch_speed / 3) + (this.ball_launch_speed / 3) * Math.random();
-			this.ball_vel[1] = Math.sqrt(this.ball_launch_speed * this.ball_launch_speed - this.ball_vel[0] * this.ball_vel[0]);
-
-			if(!this.launch_turn) this.ball_vel[0] = -this.ball_vel[0];
-			if(Math.random() < 0.5) this.ball_vel[1] = -this.ball_vel[1];
+			this.ball_pos = [(this.field_width - this.ball_size) / 2, (this.field_height - this.ball_size) / 2];
+			this.ball_vel = [0, 0];
 		}
-	}
-
-	if(!this.waiting)
-	{
-		this.ball_pos[0] += this.ball_vel[0];
-		this.ball_pos[1] += this.ball_vel[1];
-
-		if(this.ball_pos[1] <= 0)
+		else if(this.waiting)
 		{
-			this.ball_pos[1] = 0;
-			this.ball_vel[1] = -this.ball_vel[1];
-		}
-		else if(this.ball_pos[1] + this.ball_size >= this.field_height)
-		{
-			this.ball_pos[1] = this.field_height - this.ball_size;
-			this.ball_vel[1] = -this.ball_vel[1];
-		}
-
-		if(!this.ball_intangible)
-		{
-			if(this.ball_pos[0] <= this.l_paddle_x_offset + this.paddle_thickness)
+			if((this.launch_turn && this.pressed(true, "launch")) || (!this.launch_turn && this.pressed(false, "launch")))
 			{
-				var collision = (this.l_paddle_y <= this.ball_pos[1]) &&
-					(this.ball_pos[1] < this.l_paddle_y + this.paddle_length);
+				this.waiting = false;
+				this.launch_turn = !this.launch_turn;
 
-				collision |= (this.l_paddle_y < this.ball_pos[1] + this.ball_size) &&
-					(this.ball_pos[1] + this.ball_size <= this.l_paddle_y + this.paddle_length);
+				this.ball_vel[0] = (2 * this.ball_launch_speed / 3) + (this.ball_launch_speed / 3) * Math.random();
+				this.ball_vel[1] = Math.sqrt(this.ball_launch_speed * this.ball_launch_speed - this.ball_vel[0] * this.ball_vel[0]);
 
-				if(collision)
-				{
-					this.ball_pos[0] = this.l_paddle_x_offset + this.paddle_thickness;
-					this.ball_vel[0] = -this.ball_vel[0];
-
-					var relative_position = this.ball_size + this.ball_pos[1] - this.l_paddle_y;
-					var resultant_angle = 2 * this.ball_warp * (relative_position / (this.ball_size + this.paddle_length));
-					resultant_angle -= this.ball_warp;
-
-					var ts = Math.sin(resultant_angle);
-					var tc = Math.cos(resultant_angle);
-
-					var new_vel = [tc * this.ball_vel[0] - ts * this.ball_vel[1],
-						ts * this.ball_vel[0] + tc * this.ball_vel[1]];
-
-					new_vel[0] = Math.max(new_vel[0] * this.ball_impact_multiplier, this.ball_min_x_vel);
-
-					this.ball_vel = new_vel;
-				}
-				else if(this.ball_pos[0] <= this.l_paddle_x_offset)
-				{
-					this.ball_intangible = true;
-				}
-			}
-			else if(this.ball_pos[0] + this.ball_size >= this.r_paddle_x_offset)
-			{
-				var collision = (this.r_paddle_y <= this.ball_pos[1]) &&
-					(this.ball_pos[1] < this.r_paddle_y + this.paddle_length);
-
-				collision |= (this.r_paddle_y < this.ball_pos[1] + this.ball_size) &&
-					(this.ball_pos[1] + this.ball_size <= this.r_paddle_y + this.paddle_length);
-
-				if(collision)
-				{
-					this.ball_pos[0] = this.r_paddle_x_offset - this.ball_size;
-					this.ball_vel[0] = -this.ball_vel[0];
-
-					var relative_position = this.ball_size + this.ball_pos[1] - this.r_paddle_y;
-					var resultant_angle = 2 * this.ball_warp * (relative_position / (this.ball_size + this.paddle_length));
-					resultant_angle -= this.ball_warp;
-					resultant_angle = -resultant_angle;
-
-					var ts = Math.sin(resultant_angle);
-					var tc = Math.cos(resultant_angle);
-
-					var new_vel = [tc * this.ball_vel[0] - ts * this.ball_vel[1],
-						ts * this.ball_vel[0] + tc * this.ball_vel[1]];
-
-					new_vel[0] = Math.min(new_vel[0] * this.ball_impact_multiplier, -this.ball_min_x_vel);
-
-					this.ball_vel = new_vel;
-				}
-				else if(this.ball_pos[0] + this.ball_size >= this.r_paddle_x_offset + this.paddle_thickness)
-				{
-					this.ball_intangible = true;
-				}
+				if(!this.launch_turn) this.ball_vel[0] = -this.ball_vel[0];
+				if(Math.random() < 0.5) this.ball_vel[1] = -this.ball_vel[1];
 			}
 		}
 
-		if(this.ball_pos[0] <= 0)
+		if(!this.waiting)
 		{
-			this.reset_needed = true;
+			this.ball_pos[0] += this.ball_vel[0];
+			this.ball_pos[1] += this.ball_vel[1];
 
-			this.ball_pos[0] = 0;
-			this.r_score ++;
-		}
-		else if(this.ball_pos[0] + this.ball_size >= this.field_width)
-		{
-			this.reset_needed = true;
+			if(this.ball_pos[1] <= 0)
+			{
+				this.ball_pos[1] = 0;
+				this.ball_vel[1] = -this.ball_vel[1];
+			}
+			else if(this.ball_pos[1] + this.ball_size >= this.field_height)
+			{
+				this.ball_pos[1] = this.field_height - this.ball_size;
+				this.ball_vel[1] = -this.ball_vel[1];
+			}
 
-			this.ball_pos[0] = this.field_width - this.ball_size;
-			this.l_score ++;
+			if(!this.ball_intangible)
+			{
+				if(this.ball_pos[0] <= this.l_paddle_x_offset + this.paddle_thickness)
+				{
+					var collision = (this.l_paddle_y <= this.ball_pos[1]) &&
+						(this.ball_pos[1] < this.l_paddle_y + this.paddle_length);
+
+					collision |= (this.l_paddle_y < this.ball_pos[1] + this.ball_size) &&
+						(this.ball_pos[1] + this.ball_size <= this.l_paddle_y + this.paddle_length);
+
+					if(collision)
+					{
+						this.ball_pos[0] = this.l_paddle_x_offset + this.paddle_thickness;
+						this.ball_vel[0] = -this.ball_vel[0];
+
+						var relative_position = this.ball_size + this.ball_pos[1] - this.l_paddle_y;
+						var resultant_angle = 2 * this.ball_warp * (relative_position / (this.ball_size + this.paddle_length));
+						resultant_angle -= this.ball_warp;
+
+						var ts = Math.sin(resultant_angle);
+						var tc = Math.cos(resultant_angle);
+
+						var new_vel = [tc * this.ball_vel[0] - ts * this.ball_vel[1],
+							ts * this.ball_vel[0] + tc * this.ball_vel[1]];
+
+						new_vel[0] = Math.max(new_vel[0] * this.ball_impact_multiplier, this.ball_min_x_vel);
+
+						this.ball_vel = new_vel;
+					}
+					else if(this.ball_pos[0] <= this.l_paddle_x_offset)
+					{
+						this.ball_intangible = true;
+					}
+				}
+				else if(this.ball_pos[0] + this.ball_size >= this.r_paddle_x_offset)
+				{
+					var collision = (this.r_paddle_y <= this.ball_pos[1]) &&
+						(this.ball_pos[1] < this.r_paddle_y + this.paddle_length);
+
+					collision |= (this.r_paddle_y < this.ball_pos[1] + this.ball_size) &&
+						(this.ball_pos[1] + this.ball_size <= this.r_paddle_y + this.paddle_length);
+
+					if(collision)
+					{
+						this.ball_pos[0] = this.r_paddle_x_offset - this.ball_size;
+						this.ball_vel[0] = -this.ball_vel[0];
+
+						var relative_position = this.ball_size + this.ball_pos[1] - this.r_paddle_y;
+						var resultant_angle = 2 * this.ball_warp * (relative_position / (this.ball_size + this.paddle_length));
+						resultant_angle -= this.ball_warp;
+						resultant_angle = -resultant_angle;
+
+						var ts = Math.sin(resultant_angle);
+						var tc = Math.cos(resultant_angle);
+
+						var new_vel = [tc * this.ball_vel[0] - ts * this.ball_vel[1],
+							ts * this.ball_vel[0] + tc * this.ball_vel[1]];
+
+						new_vel[0] = Math.min(new_vel[0] * this.ball_impact_multiplier, -this.ball_min_x_vel);
+
+						this.ball_vel = new_vel;
+					}
+					else if(this.ball_pos[0] + this.ball_size >= this.r_paddle_x_offset + this.paddle_thickness)
+					{
+						this.ball_intangible = true;
+					}
+				}
+			}
+
+			if(this.ball_pos[0] <= 0)
+			{
+				this.reset_needed = true;
+
+				this.ball_pos[0] = 0;
+				this.r_score ++;
+			}
+			else if(this.ball_pos[0] + this.ball_size >= this.field_width)
+			{
+				this.reset_needed = true;
+
+				this.ball_pos[0] = this.field_width - this.ball_size;
+				this.l_score ++;
+			}
 		}
-	}
-}
+	};
 
 TEngine.prototype.runAI = function(left)
-{
-	var buttons = {up: false, down: false, launch: false};
-
-	if(this.waiting && this.turn == this.left && Math.random() < 0.2)
-		buttons.launch = true;
-
-	var paddle_middle = (left ? this.l_paddle_y : this.r_paddle_y) + this.paddle_length / 2;
-	var ball_middle = this.ball_pos[1] + this.ball_size / 2;
-
-	if(Math.abs(paddle_middle - ball_middle) > this.ai_elasticity)
 	{
-		if(paddle_middle < ball_middle)
-			buttons.down = true;
+		if(this.waiting && this.launch_turn == left && Math.random() < 0.1)
+			this.pressOrRelease(left, "launch", true);
 		else
-			buttons.up = true;
-	}
+			this.pressOrRelease(left, "launch", false);
 
-	if(left)
-		this.l_buttons = buttons;
-	else
-		this.r_buttons = buttons;
-}
+		var paddle_middle = (left ? this.l_paddle_y : this.r_paddle_y) + this.paddle_length / 2;
+		var ball_middle = this.ball_pos[1] + this.ball_size / 2;
+
+		if(Math.abs(paddle_middle - ball_middle) > this.ai_elasticity)
+		{
+			if(paddle_middle < ball_middle)
+			{
+				this.pressOrRelease(left, "down", true);
+				this.pressOrRelease(left, "up", false);
+			}
+			else
+			{
+				this.pressOrRelease(left, "up", true);
+				this.pressOrRelease(left, "down", false);
+			}
+		}
+		else
+		{
+			this.pressOrRelease(left, "up", false);
+			this.pressOrRelease(left, "down", false);
+		}
+	};
+
+TEngine.prototype.copyFrom = function(old_state)
+	{
+		this.frame_index = old_state.frame_index;
+
+		this.reset_needed = old_state.reset_needed;
+		this.waiting = old_state.waiting;
+		this.ball_intangible = old_state.ball_intangible;
+		this.launch_turn = old_state.launch_turn;
+
+		this.l_use_ai = old_state.l_use_ai;
+		this.r_use_ai = old_state.r_use_ai;
+
+		this.ball_pos = [old_state.ball_pos[0], old_state.ball_pos[1]];
+		this.ball_vel = [old_state.ball_vel[0], old_state.ball_vel[1]];
+
+		this.l_paddle_y = old_state.l_paddle_y;
+		this.r_paddle_y = old_state.r_paddle_y;
+
+		this.l_score = old_state.l_score;
+		this.r_score = old_state.r_score;
+
+		this.l_buttons = {up: old_state.l_buttons.up,
+							down: old_state.l_buttons.down,
+							launch: old_state.l_buttons.launch};
+
+		this.r_buttons = {up: old_state.r_buttons.up,
+							down: old_state.r_buttons.down,
+							launch: old_state.r_buttons.launch};
+	};
+
+TEngine.prototype.pressed = function(left, id)
+	{
+		return (left ? this.l_buttons : this.r_buttons)[id] >= this.frame_index;
+	};
+
+TEngine.prototype.pressOrRelease = function(left, id, state)
+	{
+		if(state == this.pressed(left, id))
+			return;
+
+		(left ? this.l_buttons : this.r_buttons)[id] = (state ? Infinity : this.frame_index);
+	};
